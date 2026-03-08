@@ -48,6 +48,8 @@ WebsocketService::WebsocketService(Args args, std::shared_ptr<Conductor> conduct
                                    net::io_context &ioc)
     : SignalingService(conductor),
       args_(args),
+      ioc_(ioc),
+      ssl_ctx_(nullptr),
       ws_(InitWebSocket(ioc)),
       resolver_(net::make_strand(ioc)),
       ping_timer_(ioc),
@@ -68,19 +70,30 @@ WebSocketVariant WebsocketService::InitWebSocket(net::io_context &ioc) {
         // Ensure that only compatible OpenSSL APIs are used when BoringSSL is present.
         DEBUG_PRINT("Using TLS WebSocket, SSL version: %s", OpenSSL_version(OPENSSL_VERSION));
 
-        ssl::context ctx(ssl::context::tls);
-        ctx.set_default_verify_paths();
-        ctx.set_verify_mode(ssl::verify_peer);
+        if (!ssl_ctx_) {
+            ssl_ctx_ = std::make_unique<ssl::context>(ssl::context::tls);
+            ssl_ctx_->set_default_verify_paths();
+            ssl_ctx_->set_verify_mode(ssl::verify_peer);
+        }
 
-        return websocket::stream<ssl::stream<tcp::socket>>(net::make_strand(ioc), ctx);
+        return websocket::stream<ssl::stream<tcp::socket>>(net::make_strand(ioc), *ssl_ctx_);
     } else {
         return websocket::stream<tcp::socket>(net::make_strand(ioc));
+    }
+}
+
+void WebsocketService::ResetWebSocket() {
+    if (args_.use_tls) {
+        ws_.emplace<websocket::stream<ssl::stream<tcp::socket>>>(net::make_strand(ioc_), *ssl_ctx_);
+    } else {
+        ws_.emplace<websocket::stream<tcp::socket>>(net::make_strand(ioc_));
     }
 }
 
 void WebsocketService::Connect() {
     reconnect_pending_ = false;
     reconnect_timer_.cancel();
+    ResetWebSocket();
 
     auto port = args_.use_tls ? 443 : 80;
     INFO_PRINT("Connect to WebSocket %s:%d", args_.ws_host.c_str(), port);
@@ -190,6 +203,8 @@ void WebsocketService::OnHandshake(websocket::stream<ssl::stream<tcp::socket>> &
         ssl::stream_base::client, [this, &ws](boost::system::error_code ec) {
             if (ec) {
                 ERROR_PRINT("Failed to tls handshake: %s", ec.message().c_str());
+                ScheduleReconnect();
+                return;
             }
             std::string target =
                 BuildWebSocketTarget("/rtc", {{"apiKey", args_.ws_key},
