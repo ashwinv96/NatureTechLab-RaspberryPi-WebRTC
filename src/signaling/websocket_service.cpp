@@ -48,7 +48,6 @@ WebsocketService::WebsocketService(Args args, std::shared_ptr<Conductor> conduct
                                    net::io_context &ioc)
     : SignalingService(conductor),
       args_(args),
-      ioc_(ioc),
       ws_(InitWebSocket(ioc)),
       resolver_(net::make_strand(ioc)),
       ping_timer_(ioc),
@@ -82,7 +81,6 @@ WebSocketVariant WebsocketService::InitWebSocket(net::io_context &ioc) {
 void WebsocketService::Connect() {
     reconnect_pending_ = false;
     reconnect_timer_.cancel();
-    ws_ = InitWebSocket(ioc_);
 
     auto port = args_.use_tls ? 443 : 80;
     INFO_PRINT("Connect to WebSocket %s:%d", args_.ws_host.c_str(), port);
