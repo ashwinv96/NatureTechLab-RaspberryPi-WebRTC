@@ -38,7 +38,6 @@ class WebsocketService : public SignalingService {
 
   private:
     Args args_;
-    net::io_context &ioc_;
     WebSocketVariant ws_;
     tcp::resolver resolver_;
     beast::flat_buffer buffer_;
