@@ -10,6 +10,7 @@
 #include <boost/beast/ssl.hpp>
 #include <boost/beast/websocket.hpp>
 
+#include <memory>
 #include <variant>
 
 namespace beast = boost::beast;
@@ -38,6 +39,8 @@ class WebsocketService : public SignalingService {
 
   private:
     Args args_;
+    net::io_context &ioc_;
+    std::unique_ptr<ssl::context> ssl_ctx_;
     WebSocketVariant ws_;
     tcp::resolver resolver_;
     beast::flat_buffer buffer_;
@@ -51,6 +54,7 @@ class WebsocketService : public SignalingService {
     bool stopping_ = false;
 
     WebSocketVariant InitWebSocket(net::io_context &ioc);
+    void ResetWebSocket();
     void ScheduleReconnect(int delay_seconds = 3);
     void OnResolve(beast::error_code ec, tcp::resolver::results_type results);
     void OnConnect(beast::error_code ec);
