@@ -38,6 +38,7 @@ class WebsocketService : public SignalingService {
 
   private:
     Args args_;
+    net::io_context &ioc_;
     WebSocketVariant ws_;
     tcp::resolver resolver_;
     beast::flat_buffer buffer_;
@@ -46,8 +47,12 @@ class WebsocketService : public SignalingService {
     rtc::scoped_refptr<RtcPeer> pub_peer_;
     rtc::scoped_refptr<RtcPeer> sub_peer_;
     boost::asio::steady_timer ping_timer_;
+    boost::asio::steady_timer reconnect_timer_;
+    bool reconnect_pending_ = false;
+    bool stopping_ = false;
 
     WebSocketVariant InitWebSocket(net::io_context &ioc);
+    void ScheduleReconnect(int delay_seconds = 3);
     void OnResolve(beast::error_code ec, tcp::resolver::results_type results);
     void OnConnect(beast::error_code ec);
     void OnHandshake(beast::error_code ec);

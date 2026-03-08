@@ -48,11 +48,17 @@ WebsocketService::WebsocketService(Args args, std::shared_ptr<Conductor> conduct
                                    net::io_context &ioc)
     : SignalingService(conductor),
       args_(args),
+      ioc_(ioc),
       ws_(InitWebSocket(ioc)),
       resolver_(net::make_strand(ioc)),
-      ping_timer_(ioc) {}
+      ping_timer_(ioc),
+      reconnect_timer_(ioc) {}
 
-WebsocketService::~WebsocketService() { Disconnect(); }
+WebsocketService::~WebsocketService() {
+    stopping_ = true;
+    reconnect_timer_.cancel();
+    Disconnect();
+}
 
 WebSocketVariant WebsocketService::InitWebSocket(net::io_context &ioc) {
     if (args_.use_tls) {
@@ -74,6 +80,10 @@ WebSocketVariant WebsocketService::InitWebSocket(net::io_context &ioc) {
 }
 
 void WebsocketService::Connect() {
+    reconnect_pending_ = false;
+    reconnect_timer_.cancel();
+    ws_ = InitWebSocket(ioc_);
+
     auto port = args_.use_tls ? 443 : 80;
     INFO_PRINT("Connect to WebSocket %s:%d", args_.ws_host.c_str(), port);
 
@@ -86,9 +96,15 @@ void WebsocketService::Connect() {
 
 void WebsocketService::Disconnect() {
     ping_timer_.cancel();
+    {
+        std::lock_guard<std::mutex> lock(write_mutex_);
+        write_queue_.clear();
+    }
+    pub_peer_ = nullptr;
+    sub_peer_ = nullptr;
 
     std::visit(
-        [](auto &ws) {
+        [this](auto &ws) {
             if (ws.is_open()) {
                 ws.async_close(websocket::close_code::normal, [](boost::system::error_code ec) {
                     if (ec) {
@@ -102,11 +118,37 @@ void WebsocketService::Disconnect() {
             }
         },
         ws_);
+
+    if (!stopping_) {
+        ScheduleReconnect();
+    }
+}
+
+void WebsocketService::ScheduleReconnect(int delay_seconds) {
+    if (stopping_ || reconnect_pending_) {
+        return;
+    }
+
+    reconnect_pending_ = true;
+    reconnect_timer_.expires_after(std::chrono::seconds(delay_seconds));
+    reconnect_timer_.async_wait([this](const boost::system::error_code &ec) {
+        reconnect_pending_ = false;
+        if (ec == boost::asio::error::operation_aborted || stopping_) {
+            return;
+        }
+        if (ec) {
+            ERROR_PRINT("Reconnect timer error: %s", ec.message().c_str());
+            return;
+        }
+        INFO_PRINT("Reconnecting WebSocket...");
+        Connect();
+    });
 }
 
 void WebsocketService::OnResolve(beast::error_code ec, tcp::resolver::results_type results) {
     if (ec) {
         ERROR_PRINT("Failed to resolve: %s", ec.message().c_str());
+        ScheduleReconnect();
         return;
     }
 
@@ -123,6 +165,7 @@ void WebsocketService::OnResolve(beast::error_code ec, tcp::resolver::results_ty
 void WebsocketService::OnConnect(beast::error_code ec) {
     if (ec) {
         ERROR_PRINT("Failed to connect: %s", ec.message().c_str());
+        ScheduleReconnect();
         return;
     }
 
@@ -164,6 +207,7 @@ void WebsocketService::OnHandshake(websocket::stream<ssl::stream<tcp::socket>> &
 void WebsocketService::OnHandshake(beast::error_code ec) {
     if (ec) {
         ERROR_PRINT("Failed to handshake: %s", ec.message().c_str());
+        ScheduleReconnect();
         return;
     }
 
@@ -322,6 +366,7 @@ void WebsocketService::DoWrite() {
                                if (ec) {
                                    ERROR_PRINT("Failed to write: %s", ec.message().c_str());
                                    Disconnect();
+                                   return;
                                }
 
                                write_queue_.pop_front();
