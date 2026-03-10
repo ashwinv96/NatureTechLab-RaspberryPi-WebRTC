@@ -206,6 +206,12 @@ void Conductor::InitializeDataChannels(rtc::scoped_refptr<RtcPeer> peer) {
 
 void Conductor::InitializeCommandChannel(rtc::scoped_refptr<RtcPeer> peer) {
     auto cmd_channel = peer->CreateDataChannel(ChannelMode::Command);
+    if (!cmd_channel) {
+        ERROR_PRINT("InitializeCommandChannel failed: CreateDataChannel returned null");
+        return;
+    }
+    INFO_PRINT("InitializeCommandChannel ready on peer=%s channel=%s",
+               peer->id().c_str(), cmd_channel->label().c_str());
     cmd_channel->RegisterHandler(
         protocol::CommandType::TAKE_SNAPSHOT,
         [this](std::shared_ptr<RtcChannel> datachannel, const protocol::Packet pkt) {
@@ -250,11 +256,14 @@ void Conductor::InitializeCommandChannel(rtc::scoped_refptr<RtcPeer> peer) {
 void Conductor::TakeSnapshot(std::shared_ptr<RtcChannel> datachannel, const protocol::Packet &pkt) {
     try {
         auto quality = std::clamp(pkt.take_snapshot_request().quality(), 0u, 100u);
+        INFO_PRINT("TAKE_SNAPSHOT received quality=%u stream_idx=%d", quality, args.live_stream_idx);
 
         auto i420buff = video_capture_source_->GetI420Frame(args.live_stream_idx);
-        auto jpg_buffer = Utils::ConvertYuvToJpeg(
-            i420buff->DataY(), video_capture_source_->width(args.live_stream_idx),
-            video_capture_source_->height(args.live_stream_idx), quality);
+        auto width = video_capture_source_->width(args.live_stream_idx);
+        auto height = video_capture_source_->height(args.live_stream_idx);
+        auto jpg_buffer = Utils::ConvertYuvToJpeg(i420buff->DataY(), width, height, quality);
+        INFO_PRINT("TAKE_SNAPSHOT sending jpeg bytes=%zu resolution=%dx%d", jpg_buffer.length, width,
+                   height);
         datachannel->Send(std::move(jpg_buffer));
     } catch (const std::exception &e) {
         ERROR_PRINT("%s", e.what());

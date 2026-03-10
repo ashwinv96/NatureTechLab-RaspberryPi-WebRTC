@@ -91,6 +91,8 @@ std::shared_ptr<RtcChannel> RtcPeer::CreateDataChannel(ChannelMode mode) {
     }
 
     auto label = ChannelModeToString(mode);
+    INFO_PRINT("CreateDataChannel label=%s is_sfu=%d negotiated=%d id=%d",
+               label.c_str(), is_sfu_peer_ ? 1 : 0, init.negotiated ? 1 : 0, init.id);
     auto result = peer_connection_->CreateDataChannelOrError(label, &init);
 
     if (!result.ok()) {
@@ -104,7 +106,7 @@ std::shared_ptr<RtcChannel> RtcPeer::CreateDataChannel(ChannelMode mode) {
         is_sfu_peer_ ? SfuChannel::Create(dc) : RtcChannel::Create(dc);
 
     if (mode == ChannelMode::Command) {
-        DEBUG_PRINT("The Command data channel is established successfully.");
+        INFO_PRINT("Command data channel object created label=%s", label.c_str());
         cmd_channel_ = channel;
 
         cmd_channel_->RegisterHandler(
@@ -167,7 +169,7 @@ void RtcPeer::OnSignalingChange(webrtc::PeerConnectionInterface::SignalingState 
 }
 
 void RtcPeer::OnDataChannel(rtc::scoped_refptr<webrtc::DataChannelInterface> channel) {
-    DEBUG_PRINT("On remote DataChannel => %s", channel->label().c_str());
+    INFO_PRINT("On remote DataChannel => %s", channel->label().c_str());
 
     if (!on_data_channel_) {
         return;

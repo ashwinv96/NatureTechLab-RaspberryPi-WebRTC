@@ -23,8 +23,8 @@ std::string RtcChannel::label() const { return label_; }
 
 void RtcChannel::OnStateChange() {
     webrtc::DataChannelInterface::DataState state = data_channel->state();
-    DEBUG_PRINT("[%s] OnStateChange => %s", data_channel->label().c_str(),
-                webrtc::DataChannelInterface::DataStateString(state));
+    INFO_PRINT("[%s] DataChannel state => %s", data_channel->label().c_str(),
+               webrtc::DataChannelInterface::DataStateString(state));
 }
 
 void RtcChannel::Terminate() {
@@ -40,6 +40,7 @@ void RtcChannel::OnClosed(std::function<void()> func) { on_closed_func_ = std::m
 void RtcChannel::OnMessage(const webrtc::DataBuffer &buffer) {
     const uint8_t *data = buffer.data.data<uint8_t>();
     size_t length = buffer.data.size();
+    INFO_PRINT("[%s] DataChannel message received bytes=%zu", data_channel->label().c_str(), length);
     std::string message(reinterpret_cast<const char *>(data), length);
 
     Next(message);
@@ -67,7 +68,7 @@ void RtcChannel::Next(const std::string &message) {
         return;
     }
 
-    DEBUG_PRINT("Received packet type: %s", protocol::CommandType_Name(packet.type()).c_str());
+    INFO_PRINT("Received packet type: %s", protocol::CommandType_Name(packet.type()).c_str());
 
     if (packet.type() == protocol::CommandType::CUSTOM) {
         if (packet.has_custom_command()) {
