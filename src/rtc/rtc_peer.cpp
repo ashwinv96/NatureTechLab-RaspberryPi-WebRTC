@@ -82,9 +82,9 @@ rtc::scoped_refptr<webrtc::PeerConnectionInterface> RtcPeer::GetPeer() { return 
 std::shared_ptr<RtcChannel> RtcPeer::CreateDataChannel(ChannelMode mode) {
     struct webrtc::DataChannelInit init;
     init.ordered = true;
-    init.id = static_cast<int>(mode);
     if (!is_sfu_peer_) {
         init.negotiated = true;
+        init.id = static_cast<int>(mode);
     }
     if (mode == ChannelMode::Lossy) {
         init.maxRetransmits = 0;
