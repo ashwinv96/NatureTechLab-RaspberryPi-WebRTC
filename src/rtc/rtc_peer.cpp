@@ -102,8 +102,12 @@ std::shared_ptr<RtcChannel> RtcPeer::CreateDataChannel(ChannelMode mode) {
 
     auto dc = result.MoveValue();
 
-    std::shared_ptr<RtcChannel> channel =
-        is_sfu_peer_ ? SfuChannel::Create(dc) : RtcChannel::Create(dc);
+    std::shared_ptr<RtcChannel> channel;
+    if (is_sfu_peer_) {
+        channel = SfuChannel::Create(dc);
+    } else {
+        channel = RtcChannel::Create(dc);
+    }
 
     if (mode == ChannelMode::Command) {
         INFO_PRINT("Command data channel object created label=%s", label.c_str());
@@ -241,12 +245,12 @@ void RtcPeer::OnSuccess(webrtc::SessionDescriptionInterface *desc) {
      * passive. */
     // modified_sdp_ = ModifySetupAttribute(sdp, "passive");
     modified_sdp_ = sdp;
-
+    webrtc::SdpParseError modified_desc_error_;
     modified_desc_ =
-        webrtc::CreateSessionDescription(desc->GetType(), modified_sdp_, modified_desc_error_);
+        webrtc::CreateSessionDescription(desc->GetType(), modified_sdp_, &modified_desc_error_);
     if (!modified_desc_) {
         ERROR_PRINT("Failed to create session description: %s",
-                    modified_desc_error_->description.c_str());
+                    modified_desc_error_.description.c_str());
         return;
     }
 

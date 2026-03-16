@@ -12,7 +12,7 @@ Turn Raspberry Pi or NVIDIA Jetson into a low-latency<b> ~200ms </b> WebRTC stre
 
 
 <p align="center">
-    <a href="https://chromium.googlesource.com/external/webrtc/+/branch-heads/5790"><img src="https://img.shields.io/badge/libwebrtc-m115.5790-red.svg" alt="WebRTC Version"></a>
+    <a href="https://chromium.googlesource.com/external/webrtc/+/branch-heads/6613"><img src="https://img.shields.io/badge/libwebrtc-m128.6613-red.svg" alt="WebRTC Version"></a>
     <img src="https://img.shields.io/github/downloads/TzuHuanTai/RaspberryPi_WebRTC/total.svg?color=yellow" alt="Download">
     <img src="https://img.shields.io/badge/C%2B%2B-20-brightgreen?logo=cplusplus">
     <img src="https://img.shields.io/github/v/release/TzuHuanTai/RaspberryPi_WebRTC?color=blue" alt="Release">
@@ -65,8 +65,8 @@ sudo apt install libmosquitto1 pulseaudio libavformat61 libswscale8 libprotobuf3
 
 Get the latest [release binary](https://github.com/TzuHuanTai/RaspberryPi-WebRTC/releases) .
 ```bash
-wget https://github.com/TzuHuanTai/RaspberryPi-WebRTC/releases/latest/download/pi-webrtc-v1.3.0_raspios-trixie-arm64.tar.gz
-tar -xzf pi-webrtc-v1.3.0_raspios-trixie-arm64.tar.gz
+wget https://github.com/TzuHuanTai/RaspberryPi-WebRTC/releases/latest/download/pi-webrtc_raspios-trixie-arm64.tar.gz
+tar -xzf pi-webrtc_raspios-trixie-arm64.tar.gz
 ```
 
 ### 4. MQTT Signaling
