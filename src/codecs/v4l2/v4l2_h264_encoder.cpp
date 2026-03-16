@@ -107,7 +107,7 @@ void V4L2H264Encoder::SendFrame(const webrtc::VideoFrame &frame, V4L2Buffer &enc
         webrtc::H264PacketizationMode::NonInterleaved;
 
     encoded_image_.SetEncodedData(encoded_image_buffer);
-    encoded_image_.SetRtpTimestamp(frame.rtp_timestamp());
+    encoded_image_.SetTimestamp(frame.timestamp());
     encoded_image_.SetColorSpace(frame.color_space());
     encoded_image_._encodedWidth = width_;
     encoded_image_._encodedHeight = height_;
