@@ -103,7 +103,12 @@ std::shared_ptr<RtcChannel> RtcPeer::CreateDataChannel(ChannelMode mode) {
     auto dc = result.MoveValue();
 
     std::shared_ptr<RtcChannel> channel;
-    if (is_sfu_peer_) {
+    // Command channel carries Coralline protocol packets directly.
+    // Even in SFU/websocket-style flows we keep it as raw RtcChannel so
+    // browser command packets (e.g. TAKE_SNAPSHOT) are parsed correctly.
+    if (mode == ChannelMode::Command) {
+        channel = RtcChannel::Create(dc);
+    } else if (is_sfu_peer_) {
         channel = SfuChannel::Create(dc);
     } else {
         channel = RtcChannel::Create(dc);
