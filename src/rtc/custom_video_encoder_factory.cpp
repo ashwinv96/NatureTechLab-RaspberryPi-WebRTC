@@ -48,7 +48,7 @@ std::vector<webrtc::SdpVideoFormat> CustomVideoEncoderFactory::GetSupportedForma
                                                     webrtc::H264Level::kLevel4, "0"));
         // av1
         supported_codecs.push_back(
-            webrtc::SdpVideoFormat(cricket::kAv1CodecName, webrtc::CodecParameterMap(),
+            webrtc::SdpVideoFormat(cricket::kAv1CodecName, webrtc::SdpVideoFormat::Parameters(),
                                    webrtc::LibaomAv1EncoderSupportedScalabilityModes()));
 #endif
     } else {
@@ -60,7 +60,7 @@ std::vector<webrtc::SdpVideoFormat> CustomVideoEncoderFactory::GetSupportedForma
                                 std::end(supported_vp9_formats));
         // av1
         supported_codecs.push_back(
-            webrtc::SdpVideoFormat(cricket::kAv1CodecName, webrtc::CodecParameterMap(),
+            webrtc::SdpVideoFormat(cricket::kAv1CodecName, webrtc::SdpVideoFormat::Parameters(),
                                    webrtc::LibaomAv1EncoderSupportedScalabilityModes()));
         // sw h264
         auto supported_h264_formats = webrtc::SupportedH264Codecs(true);
