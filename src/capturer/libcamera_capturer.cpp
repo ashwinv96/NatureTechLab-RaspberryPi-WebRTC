@@ -237,6 +237,68 @@ bool LibcameraCapturer::SetControls(int key, int value) {
     return true;
 }
 
+bool LibcameraCapturer::SetExposureTimeUs(int exposure_time_us) {
+    std::lock_guard<std::mutex> lock(control_mutex_);
+    if (exposure_time_us <= 0) {
+        controls_.set(libcamera::controls::ExposureTimeMode, libcamera::controls::ExposureTimeModeAuto);
+        DEBUG_PRINT("  Set runtime exposure mode: auto");
+    } else {
+        controls_.set(libcamera::controls::ExposureTimeMode,
+                      libcamera::controls::ExposureTimeModeManual);
+        controls_.set(libcamera::controls::ExposureTime, exposure_time_us);
+        DEBUG_PRINT("  Set runtime exposure time(us): %d", exposure_time_us);
+    }
+    is_controls_updated_ = true;
+    return true;
+}
+
+bool LibcameraCapturer::SetAnalogueGain(float gain) {
+    std::lock_guard<std::mutex> lock(control_mutex_);
+    if (gain <= 0.0f) {
+        controls_.set(libcamera::controls::AnalogueGainMode, libcamera::controls::AnalogueGainModeAuto);
+        DEBUG_PRINT("  Set runtime gain mode: auto");
+    } else {
+        controls_.set(libcamera::controls::AnalogueGainMode,
+                      libcamera::controls::AnalogueGainModeManual);
+        controls_.set(libcamera::controls::AnalogueGain, gain);
+        DEBUG_PRINT("  Set runtime gain: %.3f", gain);
+    }
+    is_controls_updated_ = true;
+    return true;
+}
+
+bool LibcameraCapturer::SetExposureValue(float ev) {
+    std::lock_guard<std::mutex> lock(control_mutex_);
+    controls_.set(libcamera::controls::ExposureValue, ev);
+    DEBUG_PRINT("  Set runtime EV: %.3f", ev);
+    is_controls_updated_ = true;
+    return true;
+}
+
+bool LibcameraCapturer::SetBrightness(float brightness) {
+    std::lock_guard<std::mutex> lock(control_mutex_);
+    controls_.set(libcamera::controls::Brightness, brightness);
+    DEBUG_PRINT("  Set runtime brightness: %.3f", brightness);
+    is_controls_updated_ = true;
+    return true;
+}
+
+bool LibcameraCapturer::SetContrast(float contrast) {
+    std::lock_guard<std::mutex> lock(control_mutex_);
+    controls_.set(libcamera::controls::Contrast, contrast);
+    DEBUG_PRINT("  Set runtime contrast: %.3f", contrast);
+    is_controls_updated_ = true;
+    return true;
+}
+
+bool LibcameraCapturer::SetSaturation(float saturation) {
+    std::lock_guard<std::mutex> lock(control_mutex_);
+    controls_.set(libcamera::controls::Saturation, saturation);
+    DEBUG_PRINT("  Set runtime saturation: %.3f", saturation);
+    is_controls_updated_ = true;
+    return true;
+}
+
 void LibcameraCapturer::AllocateBuffer() {
     allocator_ = std::make_unique<libcamera::FrameBufferAllocator>(camera_);
 

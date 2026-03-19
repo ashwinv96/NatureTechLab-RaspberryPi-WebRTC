@@ -33,6 +33,53 @@
 #include "rtc/custom_video_encoder_factory.h"
 #include "track/v4l2dma_track_source.h"
 
+#include <optional>
+#include <sstream>
+#include <type_traits>
+#include <unordered_map>
+
+namespace {
+std::unordered_map<std::string, std::string> ParseRuntimeTuningPairs(const std::string &input) {
+    std::unordered_map<std::string, std::string> out;
+    std::stringstream ss(input);
+    std::string token;
+    while (std::getline(ss, token, ';')) {
+        if (token.empty()) {
+            continue;
+        }
+        const auto equal_pos = token.find('=');
+        if (equal_pos == std::string::npos) {
+            continue;
+        }
+        auto key = token.substr(0, equal_pos);
+        auto value = token.substr(equal_pos + 1);
+        if (!key.empty() && !value.empty()) {
+            out[key] = value;
+        }
+    }
+    return out;
+}
+
+template <typename T>
+std::optional<T> ParseOptional(const std::unordered_map<std::string, std::string> &pairs,
+                               const std::string &key) {
+    const auto it = pairs.find(key);
+    if (it == pairs.end()) {
+        return std::nullopt;
+    }
+    try {
+        if constexpr (std::is_same_v<T, int>) {
+            return std::stoi(it->second);
+        } else if constexpr (std::is_same_v<T, float>) {
+            return std::stof(it->second);
+        }
+    } catch (...) {
+        return std::nullopt;
+    }
+    return std::nullopt;
+}
+} // namespace
+
 std::shared_ptr<Conductor> Conductor::Create(Args args) {
     auto ptr = std::make_shared<Conductor>(args);
     ptr->InitializePeerConnectionFactory();
@@ -239,6 +286,11 @@ void Conductor::InitializeCommandChannel(rtc::scoped_refptr<RtcPeer> peer) {
         [this](std::shared_ptr<RtcChannel> datachannel, const protocol::Packet pkt) {
             StopRecording(datachannel, pkt);
         });
+    cmd_channel->RegisterHandler(
+        protocol::CommandType::CUSTOM,
+        [this](std::shared_ptr<RtcChannel> datachannel, const protocol::Packet pkt) {
+            ApplyRuntimeTuning(datachannel, pkt);
+        });
 
     cmd_channel->OnClosed([this]() {
         auto recorder = ondemand_recorder_.lock();
@@ -368,6 +420,68 @@ void Conductor::ControlCamera(std::shared_ptr<RtcChannel> datachannel,
     } catch (const std::exception &e) {
         ERROR_PRINT("%s", e.what());
     }
+}
+
+void Conductor::ApplyRuntimeTuning(std::shared_ptr<RtcChannel> datachannel,
+                                   const protocol::Packet &pkt) {
+#if !defined(USE_LIBCAMERA_CAPTURE)
+    ERROR_PRINT("Runtime tuning is only available with libcamera capture.");
+    return;
+#else
+    if (!pkt.has_custom_command()) {
+        ERROR_PRINT("Runtime tuning packet missing custom_command payload.");
+        return;
+    }
+    if (!args.use_libcamera) {
+        ERROR_PRINT("Runtime tuning requires --camera=libcamera:*.");
+        return;
+    }
+
+    auto libcamera = std::dynamic_pointer_cast<LibcameraCapturer>(video_capture_source_);
+    if (!libcamera) {
+        ERROR_PRINT("Runtime tuning unavailable: libcamera capturer not active.");
+        return;
+    }
+
+    const std::string payload = pkt.custom_command();
+    const auto pairs = ParseRuntimeTuningPairs(payload);
+    if (pairs.empty()) {
+        ERROR_PRINT("Runtime tuning payload empty or invalid: %s", payload.c_str());
+        return;
+    }
+
+    bool updated = false;
+    if (auto shutter_us = ParseOptional<int>(pairs, "shutter_us")) {
+        libcamera->SetExposureTimeUs(std::max(0, *shutter_us));
+        updated = true;
+    }
+    if (auto gain = ParseOptional<float>(pairs, "gain")) {
+        libcamera->SetAnalogueGain(std::max(0.0f, *gain));
+        updated = true;
+    }
+    if (auto ev = ParseOptional<float>(pairs, "ev")) {
+        libcamera->SetExposureValue(std::clamp(*ev, -10.0f, 10.0f));
+        updated = true;
+    }
+    if (auto brightness = ParseOptional<float>(pairs, "brightness")) {
+        libcamera->SetBrightness(std::clamp(*brightness, -1.0f, 1.0f));
+        updated = true;
+    }
+    if (auto contrast = ParseOptional<float>(pairs, "contrast")) {
+        libcamera->SetContrast(std::clamp(*contrast, 0.0f, 15.99f));
+        updated = true;
+    }
+    if (auto saturation = ParseOptional<float>(pairs, "saturation")) {
+        libcamera->SetSaturation(std::clamp(*saturation, 0.0f, 15.99f));
+        updated = true;
+    }
+
+    if (!updated) {
+        ERROR_PRINT("Runtime tuning payload had no supported values: %s", payload.c_str());
+        return;
+    }
+    INFO_PRINT("Applied runtime tuning payload: %s", payload.c_str());
+#endif
 }
 
 void Conductor::SetOnDemandRecorder(std::shared_ptr<RecorderManager> recorder) {

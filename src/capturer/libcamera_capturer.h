@@ -28,6 +28,12 @@ class LibcameraCapturer : public VideoCapturer {
     Args config() const override;
 
     bool SetControls(int key, int value) override;
+    bool SetExposureTimeUs(int exposure_time_us);
+    bool SetAnalogueGain(float gain);
+    bool SetExposureValue(float ev);
+    bool SetBrightness(float brightness);
+    bool SetContrast(float contrast);
+    bool SetSaturation(float saturation);
     void StartCapture() override;
 
     rtc::scoped_refptr<webrtc::I420BufferInterface> GetI420Frame(int stream_idx = 0) override;
