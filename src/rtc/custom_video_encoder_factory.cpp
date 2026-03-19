@@ -8,6 +8,9 @@
 
 #include <absl/strings/match.h>
 #include <media/base/media_constants.h>
+#if __has_include(<api/environment/environment.h>)
+#include <api/environment/environment.h>
+#endif
 #include <modules/video_coding/codecs/av1/av1_svc_config.h>
 #include <modules/video_coding/codecs/av1/libaom_av1_encoder.h>
 #include <modules/video_coding/codecs/h264/include/h264.h>
@@ -68,9 +71,13 @@ std::vector<webrtc::SdpVideoFormat> CustomVideoEncoderFactory::GetSupportedForma
     return supported_codecs;
 }
 
+#if __has_include(<api/environment/environment.h>)
+std::unique_ptr<webrtc::VideoEncoder> CustomVideoEncoderFactory::Create(
+    const webrtc::Environment &env, const webrtc::SdpVideoFormat &format) {
+#else
 std::unique_ptr<webrtc::VideoEncoder>
-CustomVideoEncoderFactory::Create(const webrtc::Environment &env,
-                                  const webrtc::SdpVideoFormat &format) {
+CustomVideoEncoderFactory::CreateVideoEncoder(const webrtc::SdpVideoFormat &format) {
+#endif
 #if defined(USE_JETSON_HW_ENCODER)
     if (args_.hw_accel) {
         return JetsonVideoEncoder::Create(args_);
@@ -83,14 +90,30 @@ CustomVideoEncoderFactory::Create(const webrtc::Environment &env,
             return V4L2H264Encoder::Create(args_);
         }
 #endif
+#if __has_include(<api/environment/environment.h>)
         auto settings = webrtc::H264EncoderSettings::Parse(format);
         return webrtc::CreateH264Encoder(env, settings);
+#else
+        return webrtc::H264Encoder::Create(cricket::VideoCodec(format));
+#endif
     } else if (absl::EqualsIgnoreCase(format.name, cricket::kVp8CodecName)) {
+#if __has_include(<api/environment/environment.h>)
         return webrtc::CreateVp8Encoder(env);
+#else
+        return webrtc::VP8Encoder::Create();
+#endif
     } else if (absl::EqualsIgnoreCase(format.name, cricket::kVp9CodecName)) {
+#if __has_include(<api/environment/environment.h>)
         return webrtc::CreateVp9Encoder(env);
+#else
+        return webrtc::VP9Encoder::Create(cricket::VideoCodec(format));
+#endif
     } else if (absl::EqualsIgnoreCase(format.name, cricket::kAv1CodecName)) {
+#if __has_include(<api/environment/environment.h>)
         return webrtc::CreateLibaomAv1Encoder(env);
+#else
+        return webrtc::CreateLibaomAv1Encoder();
+#endif
     }
 
     return nullptr;
