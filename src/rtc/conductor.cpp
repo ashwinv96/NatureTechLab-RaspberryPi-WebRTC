@@ -195,11 +195,10 @@ void Conductor::InitializeDataChannels(rtc::scoped_refptr<RtcPeer> peer) {
         }
     }
 
-    // Snapshot/record/control commands should be available on the publishing peer
-    // regardless of signaling backend (direct, websocket relay, SFU-like flows).
-    if (peer->isPublisher()) {
-        InitializeCommandChannel(peer);
-    }
+    // Snapshot/record/control commands should be available for non-subscriber peers.
+    // In websocket-relay flows, peer publisher/subscriber flags can differ from SFU mode,
+    // so don't gate command channel creation solely on isPublisher().
+    InitializeCommandChannel(peer);
 }
 
 void Conductor::InitializeCommandChannel(rtc::scoped_refptr<RtcPeer> peer) {
