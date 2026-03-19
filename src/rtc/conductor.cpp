@@ -287,9 +287,8 @@ void Conductor::InitializeCommandChannel(rtc::scoped_refptr<RtcPeer> peer) {
             StopRecording(datachannel, pkt);
         });
     cmd_channel->RegisterHandler(
-        protocol::CommandType::CUSTOM,
-        [this](std::shared_ptr<RtcChannel> datachannel, const protocol::Packet pkt) {
-            ApplyRuntimeTuning(datachannel, pkt);
+        [this](const std::string &payload) {
+            ApplyRuntimeTuning(payload);
         });
 
     cmd_channel->OnClosed([this]() {
@@ -422,16 +421,11 @@ void Conductor::ControlCamera(std::shared_ptr<RtcChannel> datachannel,
     }
 }
 
-void Conductor::ApplyRuntimeTuning(std::shared_ptr<RtcChannel> datachannel,
-                                   const protocol::Packet &pkt) {
+void Conductor::ApplyRuntimeTuning(const std::string &payload) {
 #if !defined(USE_LIBCAMERA_CAPTURE)
     ERROR_PRINT("Runtime tuning is only available with libcamera capture.");
     return;
 #else
-    if (!pkt.has_custom_command()) {
-        ERROR_PRINT("Runtime tuning packet missing custom_command payload.");
-        return;
-    }
     if (!args.use_libcamera) {
         ERROR_PRINT("Runtime tuning requires --camera=libcamera:*.");
         return;
@@ -443,7 +437,6 @@ void Conductor::ApplyRuntimeTuning(std::shared_ptr<RtcChannel> datachannel,
         return;
     }
 
-    const std::string payload = pkt.custom_command();
     const auto pairs = ParseRuntimeTuningPairs(payload);
     if (pairs.empty()) {
         ERROR_PRINT("Runtime tuning payload empty or invalid: %s", payload.c_str());
